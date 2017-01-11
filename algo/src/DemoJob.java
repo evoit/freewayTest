@@ -15,6 +15,6 @@ public class DemoJob extends AbstractJob{
         log("Hello world!");
     }
     public void onTimer(){
-        debug("timer invoked");
+        debug("timer invoked every second");
     }
 }
