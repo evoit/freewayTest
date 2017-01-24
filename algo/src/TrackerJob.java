@@ -16,11 +16,14 @@ public class TrackerJob extends AbstractJob {
 
     double lastPrice;
     double underlyingPrice;
+<<<<<<< HEAD
     double optionMid;
     double futureMid;
     double impliedVol;
     Prices futurePrices;
     Prices optionPrices;
+=======
+>>>>>>> 121877f... Added underlying price testing
 
 
     @Override
@@ -55,6 +58,13 @@ public class TrackerJob extends AbstractJob {
         if ("Last Trade".equals(choice)) {
             lastPrice = msg.price;
             log("last price is: " + lastPrice);
+        } else {
+            lastPrice = msg.price;
+            log("last price is: " + lastPrice);
+            //Prices prices=instruments().getMarketPrices(instrumentID);
+            //underlyingPrice= prices.getUnderlyingMidMarket();
+            underlyingPrice = instruments().getMarketPrices(instrumentID).getUnderlyingMidMarket();
+            log("underlying price is: " + underlyingPrice);
         }
 
         //TODO update grids
@@ -119,4 +129,9 @@ public class TrackerJob extends AbstractJob {
         Prices prices=instruments().getMarketPrices(instrumentId);
         return prices.bid == lastTrackedPrices.bid && prices.ask == lastTrackedPrices.ask;
     }
+    /*public void onMarketBidAsk(MarketBidAskMessage m) {
+        Prices prices=instruments().getMarketPrices(m.instrumentId);
+        double underlyingPrice= prices.getUnderlyingMidMarket();
+        log("underlying price is: " + underlyingPrice);
+    }*/
 }
