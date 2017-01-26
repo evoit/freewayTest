@@ -13,23 +13,12 @@ public class TrackerJob extends AbstractJob {
     String instrumentID;
     String underlyingInstrumentId;
     String choice;
-
     double lastPrice;
-    double underlyingPrice;
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 1ed7e63... Sstedd trackerjob
     double optionMid;
     double futureMid;
     double impliedVol;
     Prices futurePrices;
     Prices optionPrices;
-<<<<<<< HEAD
-=======
->>>>>>> 121877f... Added underlying price testing
-=======
->>>>>>> 1ed7e63... Sstedd trackerjob
 
 
     @Override
