@@ -66,7 +66,7 @@ public class TrackerJob extends AbstractJob {
             log("last price is: " + lastPrice);
         }
 
-        //TODO update grid with last
+        //TODO update grids
 
         /*else {
             lastPrice = msg.price;
