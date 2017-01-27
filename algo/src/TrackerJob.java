@@ -4,6 +4,7 @@ import com.optionscity.freeway.api.messages.MarketLastMessage;
 
 /**
  * Created by demo01 on 1/23/2017.
+ * This freeway Class extends AbstractJob
  */
 public class TrackerJob extends AbstractJob {
     /**
@@ -16,59 +17,61 @@ public class TrackerJob extends AbstractJob {
     private double optionMid;
     private double futureMid;
     private double impliedVol;
+    // Question I think we did this to avoid a Null value for futurePrices. What is the value of futurePrices now that it's initialized?
     private Prices futurePrices = new Prices();
     private Prices optionPrices = new Prices();
     IGrid volGrid;
 
-
+    /*
+    every new freeway algo needs to override the abstract method install()
+    this is where we declare job defined variables accessible in the algo's Configure pain.
+    */
     @Override
     public void install(IJobSetup iJobSetup) {
         iJobSetup.addVariable("Instrument", "Instrument to Track", "instrument", "");
         iJobSetup.addVariable("TrackedMetric", "Implied Vol or Last Trade", "choice:Implied Vol;Last Trade", "Implied Vol");
     }
 
+    // begin( ) tells the job how it should start and is invoked before anything else once the job is started.
     public void begin(IContainer container) {
+        // allows job to access superclass convenience methods. Actor model implementing event-handler/event call back methods on a single thread.
         super.begin(container);
+        // assign global variable instrumentID to job variable Instrument.
         instrumentID = container.getVariable("Instrument");
         underlyingInstrumentId = instruments().getInstrumentDetails(instrumentID).underlyingId;
         choice = container.getVariable("TrackedMetric");
+        // Add grid configured in Freeway
         container.addGrid("VolGrid",new String[]{"AtmVol"});
         volGrid = container.getGrid("VolGrid");
+        /* Logic to decide what to do if job is configured to track Last Trade or Implied Vol
+         * we use "Implied Vol".equals(choice) to avoid null pointer exception if choice is not configured in the job */
         if (underlyingInstrumentId == null && "Implied Vol".equals(choice)) {
             container.stopJob("No Underlying for "  + instrumentID);
         } else if (!"Last Trade".equals(choice)){
+            // if our job is not configured to Last Trade and not Null for underlyingInstrumentId then it must be tracking ATM Vol.
             container.filterMarketMessages(underlyingInstrumentId);
             futureMid = getCleanMidMkt(underlyingInstrumentId);
             optionMid = getCleanMidMkt(instrumentID);
             updateVol();
         }
+        // Once we subscribe to container.subcribeToMarketLastMessages() we must now implement onMarketLast()
         container.subscribeToMarketLastMessages();
+        // Limit messages received by the job to those that pertain only to the selected instrumentID
         container.filterMarketMessages(instrumentID);
 
         // Update initial tracker variables
         lastPrice = instruments().getMarketPrices(instrumentID).last;
         log("last price is: " + lastPrice);
-
     }
-
+    // implementation of onMarketLast() because we call container.subscribeToMarketLastMessages() in begin()
     public void onMarketLast(MarketLastMessage msg) {
         if ("Last Trade".equals(choice)) {
             lastPrice = msg.price;
             log("last price is: " + lastPrice);
         }
-
         //TODO update grids
-
-        /*else {
-            lastPrice = msg.price;
-            log("last price is: " + lastPrice);
-            //Prices prices=instruments().getMarketPrices(instrumentID);
-            //underlyingPrice= prices.getUnderlyingMidMarket();
-            underlyingPrice = instruments().getMarketPrices(instrumentID).getUnderlyingMidMarket();
-            log("underlying price is: " + underlyingPrice);
-        }*/
     }
-
+    // Question though we have implemented instances of Prices class we never called subscribeToMarketBidAskMessages()
     public void onMarketBidAsk(MarketBidAskMessage m) {
         if ("Implied Vol".equals(choice) && !isPricesTheSame(m.instrumentId)) {
             if (m.instrumentId.equals(instrumentID)) {
@@ -106,15 +109,6 @@ public class TrackerJob extends AbstractJob {
         } else {
             return 0.5*(prices.ask + prices.bid);
         }
-
-        /*else {
-            lastPrice = msg.price;
-            log("last price is: " + lastPrice);
-            //Prices prices=instruments().getMarketPrices(instrumentID);
-            //underlyingPrice= prices.getUnderlyingMidMarket();
-            underlyingPrice = instruments().getMarketPrices(instrumentID).getUnderlyingMidMarket();
-            log("underlying price is: " + underlyingPrice);
-        }*/
     }
 
     private boolean isPricesTheSame(String instrumentId){
