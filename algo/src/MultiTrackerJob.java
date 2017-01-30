@@ -2,24 +2,20 @@ import com.optionscity.freeway.api.*;
 import com.optionscity.freeway.api.messages.MarketBidAskMessage;
 import com.optionscity.freeway.api.messages.MarketLastMessage;
 
+import java.util.Collection;
+
 /**
- * Created by demo01 on 1/23/2017.
+ * Created by demo01 on 1/30/2017.
  * This freeway Class extends AbstractJob
  */
-public class TrackerJob extends AbstractJob {
+public class MultiTrackerJob extends AbstractJob {
     /**
      *
      */
-    String instrumentID;
-    private String underlyingInstrumentId;
-    private String choice;
-    private double lastPrice;
-    private double optionMid;
-    private double futureMid;
-    private double impliedVol;
     private Prices futurePrices = new Prices();
     private Prices optionPrices = new Prices();
     IGrid volGrid;
+    Collection<String> instrumentIds;
 
     /*
     every new freeway algo needs to override the abstract method install()
@@ -27,8 +23,7 @@ public class TrackerJob extends AbstractJob {
     */
     @Override
     public void install(IJobSetup iJobSetup) {
-        iJobSetup.addVariable("Instrument", "Instrument to Track", "instrument", "");
-        iJobSetup.addVariable("TrackedMetric", "Implied Vol or Last Trade", "choice:Implied Vol;Last Trade", "Implied Vol");
+        iJobSetup.addVariable("Instruments", "Instrument to Track", "instruments", "");
     }
 
     // begin( ) tells the job how it should start and is invoked before anything else once the job is started.
@@ -36,43 +31,34 @@ public class TrackerJob extends AbstractJob {
         // allows job to access superclass convenience methods. Actor model implementing event-handler/event call back methods on a single thread.
         super.begin(container);
         // assign global variable instrumentID to job variable Instrument.
-        instrumentID = container.getVariable("Instrument");
-        underlyingInstrumentId = instruments().getInstrumentDetails(instrumentID).underlyingId;
+        instrumentIds = instruments().getInstrumentIds(container.getVariable("Instruments"));
         container.subscribeToMarketBidAskMessages();
-        choice = container.getVariable("TrackedMetric");
+
+        for (String instrumentId : instrumentIds) {
+            String underlyingInstrumentId = instruments().getInstrumentDetails(instrumentId).underlyingId;
+            if (underlyingInstrumentId == null) {
+                debug("No Underlying for "  + instrumentId);
+            }
+            else {
+                container.filterMarketMessages(instrumentId);
+                container.filterMarketMessages(underlyingInstrumentId);
+                debug("Subscribing to " + instrumentId + " with the underlying " + underlyingInstrumentId);
+                updateVol(instrumentId);
+
+            }
+        }
+
         // Add grid configured in Freeway
         container.addGrid("VolGrid",new String[]{"AtmVol"});
         volGrid = container.getGrid("VolGrid");
         /* Logic to decide what to do if job is configured to track Last Trade or Implied Vol
          * we use "Implied Vol".equals(choice) to avoid null pointer exception if choice is not configured in the job */
-        if (underlyingInstrumentId == null && "Implied Vol".equals(choice)) {
-            container.stopJob("No Underlying for "  + instrumentID);
-        } else if (!"Last Trade".equals(choice)){
-            // if our job is not configured to Last Trade and not Null for underlyingInstrumentId then it must be tracking ATM Vol.
-            container.filterMarketMessages(underlyingInstrumentId);
-            futureMid = getCleanMidMkt(underlyingInstrumentId);
-            optionMid = getCleanMidMkt(instrumentID);
-            updateVol();
-        }
-        // Once we subscribe to container.subcribeToMarketLastMessages() we must now implement onMarketLast()
-        container.subscribeToMarketLastMessages();
-        // Limit messages received by the job to those that pertain only to the selected instrumentID
-        container.filterMarketMessages(instrumentID);
 
-        // Update initial tracker variables
-        lastPrice = instruments().getMarketPrices(instrumentID).last;
-        log("last price is: " + lastPrice);
-    }
-    // implementation of onMarketLast() because we call container.subscribeToMarketLastMessages() in begin()
-    public void onMarketLast(MarketLastMessage msg) {
-        if ("Last Trade".equals(choice)) {
-            lastPrice = msg.price;
-            log("last price is: " + lastPrice);
-        }
-        //TODO update grids
+        // if our job is not configured to Last Trade and not Null for underlyingInstrumentId then it must be tracking ATM Vol.
     }
     public void onMarketBidAsk(MarketBidAskMessage m) {
-        if ("Implied Vol".equals(choice) && !isPricesTheSame(m.instrumentId)) {
+        //TODO make this work aka fix instrument
+        if (!isPricesTheSame(m.instrumentId)) {
             if (m.instrumentId.equals(instrumentID)) {
                 double mid = getCleanMidMkt(m.instrumentId);
                 if (!Double.isNaN(mid)) {
@@ -90,11 +76,13 @@ public class TrackerJob extends AbstractJob {
         }
     }
 
-    private void updateVol() {
-        impliedVol = theos().calculateImpliedVolatility(instrumentID, optionMid, futureMid);
-
+    private void updateVol(String instrumentId) {
+        String underlyingInstrumentId = instruments().getInstrumentDetails(instrumentId).underlyingId;
+        double futureMid = getCleanMidMkt(underlyingInstrumentId);
+        double optionMid = getCleanMidMkt(instrumentId);
+        double impliedVol = theos().calculateImpliedVolatility(instrumentId, optionMid, futureMid);
         //TODO update grid with last implied vol
-        volGrid.set(instrumentID, "AtmVol", impliedVol);
+        volGrid.set(instrumentId, "AtmVol", impliedVol);
     }
 
     private double getCleanMidMkt (String instrumentID) {
@@ -111,6 +99,7 @@ public class TrackerJob extends AbstractJob {
     }
 
     private boolean isPricesTheSame(String instrumentId){
+        //TODO Fix dis
         Prices lastTrackedPrices;
         if (instrumentId.equals(instrumentID)) {
             lastTrackedPrices = optionPrices;
