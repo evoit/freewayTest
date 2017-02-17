@@ -14,8 +14,12 @@ import java.util.TreeMap;
 public class GammaTracker extends AbstractJob {
 
     String instrumentMonth;
-    SortedMap<Double, Double> strikeToDeltaMap;
-    SortedMap<Double, Double> strikeToGammaMap;
+    SortedMap<Double, Double> strikeToMidDeltaMap;
+    SortedMap<Double, Double> strikeToMidGammaMap;
+    SortedMap<Double, Double> strikeToBidDeltaMap;
+    SortedMap<Double, Double> strikeToBidGammaMap;
+    SortedMap<Double, Double> strikeToAskDeltaMap;
+    SortedMap<Double, Double> strikeToAskGammaMap;
     Set<String> instrumentIds;
 
     @Override
@@ -25,8 +29,12 @@ public class GammaTracker extends AbstractJob {
     public void begin(IContainer container) {
         super.begin(container);
         loadInstrumentIds();
-        strikeToDeltaMap = new TreeMap<>();
-        strikeToGammaMap = new TreeMap<>();
+        strikeToMidDeltaMap = new TreeMap<>();
+        strikeToMidGammaMap = new TreeMap<>();
+        strikeToBidDeltaMap = new TreeMap<>();
+        strikeToBidGammaMap = new TreeMap<>();
+        strikeToAskDeltaMap = new TreeMap<>();
+        strikeToAskGammaMap = new TreeMap<>();
     }
 
 
@@ -43,8 +51,20 @@ public class GammaTracker extends AbstractJob {
                 //theos().getAskGreeks()
                 double gamma = theos().getGreeks(instrumentId).gamma;
                 double delta = theos().getGreeks(instrumentId).delta;
-                strikeToDeltaMap.put(strike, delta);
-                strikeToGammaMap.put(strike, gamma);
+                strikeToMidDeltaMap.put(strike, delta);
+                strikeToMidGammaMap.put(strike, gamma);
+                double bidGamma = theos().getBidGreeks(instrumentId).gamma;
+                double bidDelta = theos().getBidGreeks(instrumentId).delta;
+                strikeToBidDeltaMap.put(strike, bidDelta);
+                strikeToBidGammaMap.put(strike, bidGamma);
+                double askGamma = theos().getAskGreeks(instrumentId).gamma;
+                double askDelta = theos().getAskGreeks(instrumentId).delta;;
+                strikeToAskDeltaMap.put(strike, askDelta);
+                strikeToAskGammaMap.put(strike, askGamma);
+
+                log("The bid delta is " + bidDelta + " gamma is " + bidGamma);
+                log("The mid delta is " + delta + " gamma is " + gamma);
+                log("The ask delta is " + askDelta + " gamma is " + askGamma);
             }
         }
     }
@@ -61,16 +81,20 @@ public class GammaTracker extends AbstractJob {
     }
 
     // Load all instruemnt ids for the desired instrument moonth
-    public void loadInstrumentIds(){
+    private void loadInstrumentIds(){
         instrumentMonth = container.getVariable("Instrument Month");
         instrumentIds = new HashSet<>();
-        for (String instrumentId : instruments().getInstrumentIds(";;;;;;;")){
-            InstrumentDetails instrumentDetails = instruments().getInstrumentDetails(instrumentId);
-            if (instrumentMonth.equals(instrumentDetails.instrumentMonth)) {
-                instrumentIds.add(instrumentId);
+
+        for (String symbol : instruments().getAllSymbols()) {
+            for (String instrumentId : instruments().getInstrumentIds(symbol + ";;;;;;;")) {
+                InstrumentDetails instrumentDetails = instruments().getInstrumentDetails(instrumentId);
+                if (instrumentMonth.equals(instrumentDetails.instrumentMonth)) {
+                    instrumentIds.add(instrumentId);
+                }
             }
         }
     }
+
     public void onTimer(){
         gammaPop();
         //TODO make another method to dump the contents of the maps into grids
