@@ -1,7 +1,4 @@
-import com.optionscity.freeway.api.AbstractJob;
-import com.optionscity.freeway.api.IContainer;
-import com.optionscity.freeway.api.IJobSetup;
-import com.optionscity.freeway.api.InstrumentDetails;
+import com.optionscity.freeway.api.*;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -21,6 +18,14 @@ public class GammaTracker extends AbstractJob {
     SortedMap<Double, Double> strikeToAskDeltaMap;
     SortedMap<Double, Double> strikeToAskGammaMap;
     Set<String> instrumentIds;
+    IGrid bidGammaGrid;
+    IGrid bidDeltaGrid;
+    IGrid midGammaGrid;
+    IGrid midDeltaGrid;
+    IGrid askGammaGrid;
+    IGrid askDeltaGrid;
+    static final double DELTA_MULTIPLIER = 100;
+    static final double GAMMA_MULTIPLIER = 100000;
 
     @Override
     public void install(IJobSetup iJobSetup) {
@@ -35,10 +40,22 @@ public class GammaTracker extends AbstractJob {
         strikeToBidGammaMap = new TreeMap<>();
         strikeToAskDeltaMap = new TreeMap<>();
         strikeToAskGammaMap = new TreeMap<>();
+        // Add grid configured in Freeway
+        container.addGrid("BidGammaGrid",new String[]{"BidGamma"});
+        bidGammaGrid = container.getGrid("BidGammaGrid");
+        container.addGrid("MidGammaGrid",new String[]{"MidGamma"});
+        midGammaGrid = container.getGrid("MidGammaGrid");
+        container.addGrid("AskGammaGrid",new String[]{"AskGamma"});
+        askGammaGrid = container.getGrid("AskGammaGrid");        
+        // Add grid configured in Freeway
+        container.addGrid("BidDeltaGrid",new String[]{"BidDelta"});
+        bidDeltaGrid = container.getGrid("BidDeltaGrid");
+        container.addGrid("MidDeltaGrid",new String[]{"MidDelta"});
+        midDeltaGrid = container.getGrid("MidDeltaGrid");
+        container.addGrid("AskDeltaGrid",new String[]{"AskDelta"});
+        askDeltaGrid = container.getGrid("AskDeltaGrid");
     }
 
-
-    // TODO add two more maps--one for bid and offer instead of mid
     public void gammaPop() {
         for (String instrumentId : instrumentIds) {
             // only use outrights
@@ -48,39 +65,48 @@ public class GammaTracker extends AbstractJob {
             InstrumentDetails.Type type = instrumentDetails.type;
             boolean isOtm = (strike > atmPrice && InstrumentDetails.Type.CALL.equals(type)) || (strike <= atmPrice && InstrumentDetails.Type.PUT.equals(type));
             if (isOtm) {
-                //theos().getAskGreeks()
-                double gamma = theos().getGreeks(instrumentId).gamma;
-                double delta = theos().getGreeks(instrumentId).delta;
+                double gamma = theos().getGreeks(instrumentId).gamma * GAMMA_MULTIPLIER;
+                double delta = theos().getGreeks(instrumentId).delta * DELTA_MULTIPLIER;
                 strikeToMidDeltaMap.put(strike, delta);
                 strikeToMidGammaMap.put(strike, gamma);
-                double bidGamma = theos().getBidGreeks(instrumentId).gamma;
-                double bidDelta = theos().getBidGreeks(instrumentId).delta;
+                double bidGamma = theos().getBidGreeks(instrumentId).gamma * GAMMA_MULTIPLIER;
+                double bidDelta = theos().getBidGreeks(instrumentId).delta * DELTA_MULTIPLIER;
                 strikeToBidDeltaMap.put(strike, bidDelta);
                 strikeToBidGammaMap.put(strike, bidGamma);
-                double askGamma = theos().getAskGreeks(instrumentId).gamma;
-                double askDelta = theos().getAskGreeks(instrumentId).delta;;
+                double askGamma = theos().getAskGreeks(instrumentId).gamma * GAMMA_MULTIPLIER;
+                double askDelta = theos().getAskGreeks(instrumentId).delta * DELTA_MULTIPLIER;
                 strikeToAskDeltaMap.put(strike, askDelta);
                 strikeToAskGammaMap.put(strike, askGamma);
 
-                log("The bid delta is " + bidDelta + " gamma is " + bidGamma);
-                log("The mid delta is " + delta + " gamma is " + gamma);
-                log("The ask delta is " + askDelta + " gamma is " + askGamma);
+                log("For " + instrumentId + "The bid delta is " + bidDelta + " gamma is " + bidGamma);
+                log("For " + instrumentId + "The mid delta is " + delta + " gamma is " + gamma);
+                log("For " + instrumentId + "The ask delta is " + askDelta + " gamma is " + askGamma);
+
+                // TODO Update the grids
+                bidGammaGrid.set(instrumentId, "BidGamma", bidGamma);
+                midGammaGrid.set(instrumentId, "MidGamma", gamma);
+                askGammaGrid.set(instrumentId, "AskGamma", askGamma);
+                bidDeltaGrid.set(instrumentId, "BidDelta", bidDelta);
+                midDeltaGrid.set(instrumentId, "MidDelta", delta);
+                askDeltaGrid.set(instrumentId, "AskDelta", askDelta);
             }
         }
     }
 
-    // TODO
-    /**
-     * Returns mid market price if both sides are available. If one side is missing, return the other side
-     *
-     * @param instrumentId
-     * @return
-     */
     private double getCleanMidMktPrice(String instrumentId) {
-        return 0d;
+        Prices prices = instruments().getMarketPrices(instrumentId);
+        if (Double.isNaN(prices.bid) && Double.isNaN(prices.ask)) {
+            return Double.NaN;
+        } else if (Double.isNaN(prices.ask)) {
+            return prices.bid;
+        } else if (Double.isNaN(prices.bid)) {
+            return prices.ask;
+        } else {
+            return 0.5*(prices.ask + prices.bid);
+        }
     }
 
-    // Load all instruemnt ids for the desired instrument moonth
+    // Load all instrument ids for the desired instrument month
     private void loadInstrumentIds(){
         instrumentMonth = container.getVariable("Instrument Month");
         instrumentIds = new HashSet<>();
