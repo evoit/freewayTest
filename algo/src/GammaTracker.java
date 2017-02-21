@@ -18,14 +18,10 @@ public class GammaTracker extends AbstractJob {
     SortedMap<Double, Double> strikeToAskDeltaMap;
     SortedMap<Double, Double> strikeToAskGammaMap;
     Set<String> instrumentIds;
-    IGrid bidGammaGrid;
-    IGrid bidDeltaGrid;
-    IGrid midGammaGrid;
-    IGrid midDeltaGrid;
-    IGrid askGammaGrid;
-    IGrid askDeltaGrid;
+    IGrid gammaGrid;
+    IGrid deltaGrid;
     static final double DELTA_MULTIPLIER = 100;
-    static final double GAMMA_MULTIPLIER = 100000;
+    static final double GAMMA_MULTIPLIER = 100;
 
     @Override
     public void install(IJobSetup iJobSetup) {
@@ -41,19 +37,12 @@ public class GammaTracker extends AbstractJob {
         strikeToAskDeltaMap = new TreeMap<>();
         strikeToAskGammaMap = new TreeMap<>();
         // Add grid configured in Freeway
-        container.addGrid("BidGammaGrid",new String[]{"BidGamma"});
-        bidGammaGrid = container.getGrid("BidGammaGrid");
-        container.addGrid("MidGammaGrid",new String[]{"MidGamma"});
-        midGammaGrid = container.getGrid("MidGammaGrid");
-        container.addGrid("AskGammaGrid",new String[]{"AskGamma"});
-        askGammaGrid = container.getGrid("AskGammaGrid");        
-        // Add grid configured in Freeway
-        container.addGrid("BidDeltaGrid",new String[]{"BidDelta"});
-        bidDeltaGrid = container.getGrid("BidDeltaGrid");
-        container.addGrid("MidDeltaGrid",new String[]{"MidDelta"});
-        midDeltaGrid = container.getGrid("MidDeltaGrid");
-        container.addGrid("AskDeltaGrid",new String[]{"AskDelta"});
-        askDeltaGrid = container.getGrid("AskDeltaGrid");
+        container.addGrid("GammaGrid",new String[]{"BidGamma", "MidGamma", "AskGamma" });
+        gammaGrid = container.getGrid("GammaGrid");
+        gammaGrid.clear();
+        container.addGrid("DeltaGrid",new String[]{"BidDelta", "MidDelta", "AskDelta" });
+        deltaGrid = container.getGrid("DeltaGrid");
+        deltaGrid.clear();
     }
 
     public void gammaPop() {
@@ -83,12 +72,12 @@ public class GammaTracker extends AbstractJob {
                 log("For " + instrumentId + "The ask delta is " + askDelta + " gamma is " + askGamma);
 
                 // TODO Update the grids
-                bidGammaGrid.set(instrumentId, "BidGamma", bidGamma);
-                midGammaGrid.set(instrumentId, "MidGamma", gamma);
-                askGammaGrid.set(instrumentId, "AskGamma", askGamma);
-                bidDeltaGrid.set(instrumentId, "BidDelta", bidDelta);
-                midDeltaGrid.set(instrumentId, "MidDelta", delta);
-                askDeltaGrid.set(instrumentId, "AskDelta", askDelta);
+                gammaGrid.set("" + strike, "BidGamma", bidGamma);
+                gammaGrid.set("" + strike, "MidGamma", gamma);
+                gammaGrid.set("" + strike, "AskGamma", askGamma);
+                deltaGrid.set("" + strike, "BidDelta", bidDelta);
+                deltaGrid.set("" + strike, "MidDelta", delta);
+                deltaGrid.set("" + strike, "AskDelta", askDelta);
             }
         }
     }
